@@ -23,6 +23,8 @@ interface ControlPanelProps {
   routes: Route[];
   activeRouteIndex: number | null;
   setActiveRouteIndex: (index: number | null) => void;
+  useLocal: boolean;
+  setUseLocal: (useLocal: boolean) => void;
 }
 
 const Section: React.FC<{ number: number; title: string; children: React.ReactNode }> = ({ number, title, children }) => (
@@ -48,7 +50,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   error,
   routes,
   activeRouteIndex,
-  setActiveRouteIndex
+  setActiveRouteIndex,
+  useLocal,
+  setUseLocal
 }) => {
 
   return (
@@ -80,7 +84,36 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
         </Section>
 
-        <Section number={4} title="Set Creativity">
+        <Section number={4} title="Choose Algorithm">
+            <div className="grid grid-cols-2 gap-3">
+                <ModeButton 
+                    selected={!useLocal} 
+                    onClick={() => setUseLocal(false)} 
+                    label="AI (Gemini)"
+                >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </ModeButton>
+                <ModeButton 
+                    selected={useLocal} 
+                    onClick={() => setUseLocal(true)} 
+                    label="Local Algorithm"
+                >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                    </svg>
+                </ModeButton>
+            </div>
+            <div className="mt-2 text-xs text-gray-400">
+                {useLocal ? 
+                    "🔧 Advanced local algorithms (DTW, Fourier, Hausdorff)" : 
+                    "🤖 AI-powered route matching with Gemini"
+                }
+            </div>
+        </Section>
+
+        <Section number={5} title="Set Creativity">
             <div className="grid grid-cols-3 gap-3">
                 <ModeButton selected={creativity === 'strict'} onClick={() => setCreativity('strict')} label="Strict"><StrictIcon /></ModeButton>
                 <ModeButton selected={creativity === 'balanced'} onClick={() => setCreativity('balanced')} label="Balanced"><BalancedIcon /></ModeButton>

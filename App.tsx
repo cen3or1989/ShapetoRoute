@@ -3,6 +3,7 @@ import ControlPanel from './components/ControlPanel';
 import MapDisplay from './components/MapDisplay';
 import { Point, Route, TransportationMode, CreativityLevel } from './types';
 import { findMatchingRoutes } from './services/geminiService';
+import { OfflineRouteService } from './services/offlineRouteService';
 
 const App: React.FC = () => {
   const [drawing, setDrawing] = useState<Point[][]>([]);
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
   const [mapZoom, setMapZoom] = useState<number>(13);
   const [activeRouteIndex, setActiveRouteIndex] = useState<number | null>(null);
+  const [useLocal, setUseLocal] = useState<boolean>(true); // پیش‌فرض روی Local
 
   const handleFindRoutes = useCallback(async () => {
     const totalPoints = drawing.flat().length;
@@ -48,20 +50,30 @@ const App: React.FC = () => {
          return;
       }
       
-      setLoadingMessage('AI is finding routes...');
-      const foundRoutes = await findMatchingRoutes(drawing, location, mode, creativity);
+      let foundRoutes: Route[];
+      
+      if (useLocal) {
+        setLoadingMessage('🔧 Local algorithm is analyzing your shape...');
+        foundRoutes = await OfflineRouteService.findMatchingRoutes(drawing, location, mode, creativity);
+      } else {
+        setLoadingMessage('🤖 AI is finding routes...');
+        foundRoutes = await findMatchingRoutes(drawing, location, mode, creativity);
+      }
 
       if (foundRoutes.length > 0) {
         setRoutes(foundRoutes);
       } else {
-        setError('No matching routes found. Try a different shape, location, or creativity level.');
+        const errorMsg = useLocal 
+          ? 'No matching routes found with local algorithm. Try a different shape or location.'
+          : 'No matching routes found. Try a different shape, location, or creativity level.';
+        setError(errorMsg);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setLoadingMessage(null);
     }
-  }, [drawing, location, mode, creativity]);
+  }, [drawing, location, mode, creativity, useLocal]);
 
   return (
     <div className="flex h-screen font-sans text-gray-50">
@@ -80,6 +92,8 @@ const App: React.FC = () => {
         routes={routes}
         activeRouteIndex={activeRouteIndex}
         setActiveRouteIndex={setActiveRouteIndex}
+        useLocal={useLocal}
+        setUseLocal={setUseLocal}
       />
       <main className="flex-1 h-full">
         <MapDisplay 
