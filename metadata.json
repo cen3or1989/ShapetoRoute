@@ -1,0 +1,5 @@
+{
+  "name": "Shape to Route",
+  "description": "An interactive web application that allows users to draw shapes on a canvas and uses AI to find real-world routes (roads, paths, cycling routes) that match the drawn shape's geometry in any specified geographic region.",
+  "requestFramePermissions": []
+}
