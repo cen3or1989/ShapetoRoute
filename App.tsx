@@ -4,6 +4,7 @@ import MapDisplay from './components/MapDisplay';
 import { Point, Route, TransportationMode, CreativityLevel } from './types';
 import { findMatchingRoutes } from './services/geminiService';
 import { OfflineRouteService } from './services/offlineRouteService';
+import { ImprovedOfflineRouteService } from './services/improvedOfflineRouteService';
 
 const App: React.FC = () => {
   const [drawing, setDrawing] = useState<Point[][]>([]);
@@ -53,8 +54,8 @@ const App: React.FC = () => {
       let foundRoutes: Route[];
       
       if (useLocal) {
-        setLoadingMessage('🔧 Local algorithm is analyzing your shape...');
-        foundRoutes = await OfflineRouteService.findMatchingRoutes(drawing, location, mode, creativity);
+        setLoadingMessage('🚀 Advanced local algorithm is analyzing your shape...');
+        foundRoutes = await ImprovedOfflineRouteService.findMatchingRoutes(drawing, location, mode, creativity);
       } else {
         setLoadingMessage('🤖 AI is finding routes...');
         foundRoutes = await findMatchingRoutes(drawing, location, mode, creativity);

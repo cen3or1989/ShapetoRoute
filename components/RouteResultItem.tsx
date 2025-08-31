@@ -11,9 +11,18 @@ interface RouteResultItemProps {
 const RouteResultItem: React.FC<RouteResultItemProps> = ({ route, isActive, onClick }) => {
     const similarityColor = () => {
         const score = route.similarityScore;
-        if (score > 0.9) return 'text-green-400 bg-green-900/50';
-        if (score > 0.75) return 'text-yellow-400 bg-yellow-900/50';
-        return 'text-orange-400 bg-orange-900/50';
+        if (score > 0.8) return 'text-green-400 bg-green-900/50';
+        if (score > 0.6) return 'text-yellow-400 bg-yellow-900/50';
+        if (score > 0.4) return 'text-orange-400 bg-orange-900/50';
+        return 'text-red-400 bg-red-900/50';
+    };
+
+    const getQualityIcon = () => {
+        const score = route.similarityScore;
+        if (score > 0.8) return '⭐';
+        if (score > 0.6) return '✓';
+        if (score > 0.4) return '~';
+        return '?';
     };
 
     return (
@@ -26,7 +35,10 @@ const RouteResultItem: React.FC<RouteResultItemProps> = ({ route, isActive, onCl
             }`}
         >
             <div className="flex justify-between items-start">
-                <h3 className="font-bold text-white text-md truncate pr-4">{route.routeName}</h3>
+                <h3 className="font-bold text-white text-md truncate pr-4">
+                    <span className="mr-2">{getQualityIcon()}</span>
+                    {route.routeName}
+                </h3>
                 <div className={`px-2.5 py-1 text-xs font-bold rounded-full ${similarityColor()}`}>
                     {(route.similarityScore * 100).toFixed(0)}% Match
                 </div>

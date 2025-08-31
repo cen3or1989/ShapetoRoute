@@ -9,11 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.16.0",
+    "@turf/distance": "^7.2.0",
+    "@turf/line-to-polygon": "^7.2.0",
+    "@turf/nearest-point-on-line": "^7.2.0",
+    "@turf/simplify": "^7.2.0",
+    "@turf/turf": "^7.2.0",
+    "dynamic-time-warping": "^1.0.0",
+    "leaflet": "^1.9.4",
+    "ml-matrix": "^6.12.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-leaflet": "^5.0.0",
-    "@google/genai": "^1.16.0",
-    "leaflet": "^1.9.4"
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

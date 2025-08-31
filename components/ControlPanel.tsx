@@ -107,7 +107,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
             <div className="mt-2 text-xs text-gray-400">
                 {useLocal ? 
-                    "🔧 Advanced local algorithms (DTW, Fourier, Hausdorff)" : 
+                    "🚀 Enhanced algorithms (Turf.js + DTW + ML techniques)" : 
                     "🤖 AI-powered route matching with Gemini"
                 }
             </div>
