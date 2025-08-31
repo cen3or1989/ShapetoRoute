@@ -4,6 +4,7 @@ import ControlPanel from './components/ControlPanel';
 import MapDisplay from './components/MapDisplay';
 import { Point, Route, TransportationMode } from './types';
 import { findMatchingRoutes } from './services/geminiService';
+import { validateShape } from './services/shapeAnalysis';
 
 const App: React.FC = () => {
   const [drawing, setDrawing] = useState<Point[][]>([]);
@@ -17,11 +18,14 @@ const App: React.FC = () => {
   const [activeRouteIndex, setActiveRouteIndex] = useState<number | null>(null);
 
   const handleFindRoutes = useCallback(async () => {
-    if (drawing.length === 0) {
-      setError('Please draw a shape first.');
+    // Enhanced shape validation
+    const shapeValidation = validateShape(drawing);
+    if (!shapeValidation.isValid) {
+      setError(`Shape validation failed: ${shapeValidation.issues.join(', ')}. Suggestions: ${shapeValidation.recommendations.join(' ')}`);
       return;
     }
-    if (!location) {
+    
+    if (!location.trim()) {
       setError('Please enter a location.');
       return;
     }
@@ -34,6 +38,11 @@ const App: React.FC = () => {
     try {
       // Geocode location to get coordinates for map view
       const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`);
+      
+      if (!geoResponse.ok) {
+        throw new Error(`Geocoding failed: ${geoResponse.status} ${geoResponse.statusText}`);
+      }
+      
       const geoData = await geoResponse.json();
       
       if (geoData.length > 0) {
@@ -41,19 +50,27 @@ const App: React.FC = () => {
         setMapCenter([parseFloat(lat), parseFloat(lon)]);
         setMapZoom(14);
       } else {
-         setError(`Could not find location: ${location}`);
+         setError(`Could not find location: ${location}. Please try a more specific location.`);
          setIsLoading(false);
          return;
       }
 
+      // Enhanced route finding with geometric analysis
       const foundRoutes = await findMatchingRoutes(drawing, location, mode);
+      
       if (foundRoutes.length > 0) {
         setRoutes(foundRoutes);
+        console.log('Shape analysis results:', foundRoutes.map(r => ({
+          name: r.routeName,
+          aiSimilarity: r.similarityScore,
+          geometricSimilarity: r.geometricSimilarity,
+          issues: r.matchingIssues
+        })));
       } else {
-        setError('No matching routes found. Try a different shape or location.');
+        setError('No geometrically matching routes found. Try a different shape or location, or draw a more distinct shape.');
       }
     } catch (err) {
-      setError(err instanceof Error ? `An error occurred: ${err.message}`: 'An unknown error occurred.');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }

@@ -30,10 +30,31 @@ const RouteResultItem: React.FC<RouteResultItemProps> = ({ route, isActive, onCl
                         <strong className="font-semibold text-white">{route.duration}</strong> min
                     </span>
                 </div>
-                <div className="bg-cyan-800 text-cyan-200 px-2 py-1 rounded-full">
-                    <strong className="font-semibold">{(route.similarityScore * 100).toFixed(0)}%</strong> match
+                <div className="flex items-center space-x-2">
+                    <div className="bg-cyan-800 text-cyan-200 px-2 py-1 rounded-full">
+                        <strong className="font-semibold">{(route.similarityScore * 100).toFixed(0)}%</strong> AI
+                    </div>
+                    {route.geometricSimilarity !== undefined && (
+                        <div className={`px-2 py-1 rounded-full ${
+                            route.geometricSimilarity > 0.7 ? 'bg-green-800 text-green-200' :
+                            route.geometricSimilarity > 0.5 ? 'bg-yellow-800 text-yellow-200' :
+                            'bg-red-800 text-red-200'
+                        }`}>
+                            <strong className="font-semibold">{(route.geometricSimilarity * 100).toFixed(0)}%</strong> geo
+                        </div>
+                    )}
                 </div>
             </div>
+            {route.matchingIssues && route.matchingIssues.length > 0 && (
+                <div className="mt-2 text-xs text-yellow-400">
+                    <div className="font-semibold">Geometric notes:</div>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                        {route.matchingIssues.map((issue, idx) => (
+                            <li key={idx} className="text-yellow-300">{issue}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 };
