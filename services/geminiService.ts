@@ -2,6 +2,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { Point, Route, TransportationMode } from '../types';
 import { validateApiKey, sanitizeLocation, sanitizeRouteData } from '../utils/security';
 import { APIError } from '../types/errors';
+import { analyzeShape, generateShapeDescription, normalizePoints } from '../utils/shapeAnalysis';
+import { SHAPE_EXAMPLES } from '../constants/shapeExamples';
 
 const API_KEY = process.env.API_KEY;
 
@@ -50,45 +52,94 @@ const routeSchema = {
   },
 };
 
-function serializeDrawing(drawing: Point[][]): string {
-  return drawing.map(stroke => 
-    stroke.map(p => `${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ')
-  ).join(' M '); // Using ' M ' as a separator for multi-stroke paths
-}
-
 export const findMatchingRoutes = async (
   drawing: Point[][],
   location: string,
   mode: TransportationMode
 ): Promise<Route[]> => {
   const sanitizedLocation = sanitizeLocation(location);
-  const serializedShape = serializeDrawing(drawing);
+  
+  // Analyze the shape
+  const shapeFeatures = analyzeShape(drawing);
+  const shapeDescription = generateShapeDescription(shapeFeatures);
+  
+  // Create normalized path string for the AI
+  const normalizedPath = shapeFeatures.normalizedPath
+    .map(p => `${(p.x * 100).toFixed(1)},${(p.y * 100).toFixed(1)}`)
+    .join(' ');
 
   const prompt = `
-You are a "Geospatial Artistry AI". Your mission is to discover real-world routes that artistically and structurally evoke the essence of a user's drawing. Forget pixel-perfect geometric matches; instead, find a route that a human would recognize as a creative, recognizable representation of the drawn shape.
+You are an expert route-finding AI that matches user-drawn shapes to real-world routes.
 
-**Your Goal:**
-Find a navigable route in "${sanitizedLocation}" for the "${mode}" transportation mode that artistically resembles the following shape.
+**LOCATION:** ${sanitizedLocation}
+**TRANSPORTATION MODE:** ${mode}
 
-**Shape Data (Normalized SVG-like coordinates):**
-"${serializedShape}"
+**SHAPE ANALYSIS:**
+- Type: ${shapeFeatures.type}
+- Description: ${shapeDescription}
+- Primary Direction: ${shapeFeatures.direction}
+- Complexity: ${(shapeFeatures.complexity * 100).toFixed(0)}%
+- Curvature: ${(shapeFeatures.curvature * 100).toFixed(0)}%
+- Aspect Ratio: ${shapeFeatures.aspectRatio.toFixed(2)}
+${shapeFeatures.angles.length > 0 ? `- Key Angles: ${shapeFeatures.angles.join('°, ')}°` : ''}
 
-**Artistic Analysis Protocol:**
-1.  **Deconstruct the Shape's Essence:** Analyze the drawing not just as lines, but as a concept. What does it represent?
-    *   **Structure:** Identify the core structural elements. For a letter 'A', this is two angled lines meeting at a peak with a horizontal crossbar. For a spiral, it's a continuously tightening curve.
-    *   **Character:** Is it sharp and angular? Soft and looping? Simple? Complex?
-2.  **Find a Structural Analogy:** Search the road network of "${location}" for a route whose structure mirrors the shape's essence. The match can be scaled, rotated, or slightly distorted. The key is preserving the fundamental character.
-3.  **Creative Similarity Scoring:** The \`similarityScore\` must reflect how well the route captures the artistic spirit and structural foundation of the drawing.
-    *   **0.9+:** An incredibly clever and clear match that is instantly recognizable as the shape.
-    *   **0.7-0.89:** A good, creative representation that clearly captures the main elements.
-    *   **< 0.7:** A more abstract interpretation that shares some key characteristics. Do not return routes with scores below 0.6.
-4.  **Example Task:**
-    *   **Input Shape:** A drawing of the letter 'S'.
-    *   **Analysis:** Two opposing curves connected smoothly.
-    *   **Your Ideal Output:** Find a winding road or a set of connected streets that form a clear 'S' curve.
-5.  **Output:** Return ONLY a valid JSON array of route objects. Do not include any explanatory text or markdown.
+**NORMALIZED PATH (0-100 scale):**
+${normalizedPath}
 
-Now, apply this artistic approach to find the most evocative route for the user's shape.
+**YOUR TASK:**
+Find ${mode === 'walking' ? 'walking' : mode === 'cycling' ? 'cycling' : 'driving'} routes in ${sanitizedLocation} that match this shape.
+
+**REAL-WORLD EXAMPLES TO INSPIRE YOUR SEARCH:**
+${SHAPE_EXAMPLES[shapeFeatures.type] || ''}
+
+**MATCHING CRITERIA:**
+${shapeFeatures.type === 'circle' ? `
+- Look for circular routes, loops, or routes around landmarks (parks, lakes, stadiums)
+- The route should return close to its starting point
+- Consider routes around roundabouts or circular roads
+` : ''}
+${shapeFeatures.type === 'rectangle' ? `
+- Find routes that form a rectangular path around city blocks
+- Look for grid-based street patterns
+- The route should have roughly 90-degree turns at corners
+` : ''}
+${shapeFeatures.type === 'triangle' ? `
+- Search for triangular street patterns or routes connecting three landmarks
+- Look for routes with three distinct turning points
+- Consider routes around triangular parks or intersections
+` : ''}
+${shapeFeatures.type === 'zigzag' ? `
+- Find routes with multiple sharp turns (${shapeFeatures.angles.filter(a => a > 90).length} sharp angles detected)
+- Look for switchback roads, mountain paths, or streets with multiple direction changes
+- Match the zigzag pattern's frequency and angle severity
+` : ''}
+${shapeFeatures.type === 'spiral' ? `
+- Search for spiral roads, parking garage routes, or winding paths
+- Look for routes that gradually curve inward or outward
+- Consider helical or coiled street patterns
+` : ''}
+${shapeFeatures.type === 'curve' ? `
+- Find smoothly curving roads or paths
+- Look for routes along rivers, coastlines, or following natural contours
+- Match the curve's direction and intensity
+` : ''}
+${shapeFeatures.type === 'line' ? `
+- Find straight or gently curved routes
+- Look for main roads, highways, or direct paths
+- Match the line's direction (${shapeFeatures.direction})
+` : ''}
+
+**IMPORTANT MATCHING RULES:**
+1. The route must be actually navigable by ${mode}
+2. Prioritize routes that visually resemble the shape when viewed on a map
+3. The shape can be rotated, scaled, or slightly distorted - focus on the pattern
+4. Consider famous/notable routes that match the pattern
+5. Include practical details (actual street names, landmarks)
+6. similarityScore should reflect how recognizable the match is (0.6-1.0)
+
+**OUTPUT REQUIREMENTS:**
+Return ONLY a valid JSON array with 1-5 routes, prioritizing quality over quantity.
+Each route must have all required fields filled with realistic data.
 `;
 
   try {
@@ -98,7 +149,9 @@ Now, apply this artistic approach to find the most evocative route for the user'
         config: {
             responseMimeType: "application/json",
             responseSchema: routeSchema,
-            temperature: 0.6, // Higher temperature for more "creative" but still relevant results.
+            temperature: 0.7, // Balanced for creative but accurate results
+            topK: 40,
+            topP: 0.95,
         },
     });
 
