@@ -18,6 +18,40 @@
         height: 100%;
         width: 100%;
       }
+      
+      /* Custom animations */
+      @keyframes slide-up {
+        from {
+          transform: translateY(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      
+      .animate-slide-up {
+        animation: slide-up 0.3s ease-out;
+      }
+      
+      /* Custom scrollbar for dark theme */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #1f2937;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563;
+        border-radius: 4px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280;
+      }
     </style>
   <script type="importmap">
 {

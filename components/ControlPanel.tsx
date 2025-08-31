@@ -4,6 +4,7 @@ import type { Point, Route, TransportationMode } from '../types';
 import DrawingCanvas from './DrawingCanvas';
 import { WalkIcon, BikeIcon, CarIcon } from './icons/TransportationIcons';
 import RouteResultItem from './RouteResultItem';
+import LoadingSkeleton from './LoadingSkeleton';
 
 interface ControlPanelProps {
   drawing: Point[][];
@@ -103,7 +104,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <div className="flex-grow overflow-y-auto pr-2 -mr-2">
             <h2 className="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-2 mb-4">Results</h2>
-            {routes.length > 0 ? (
+            {isLoading ? (
+                <LoadingSkeleton count={3} />
+            ) : routes.length > 0 ? (
                 <div className="space-y-3">
                     {routes.map((route, index) => (
                         <RouteResultItem 
@@ -117,7 +120,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
             ) : (
                 <div className="text-center text-gray-500 py-8">
-                    { !isLoading && <p>Matching routes will appear here.</p> }
+                    <p>Matching routes will appear here.</p>
                 </div>
             )}
         </div>
