@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Point, Route, TransportationMode } from '../types';
+import type { Point, Route, TransportationMode, CreativityLevel } from '../types';
+import { analyzeShape, ShapeFeatures } from './shapeAnalysisService';
 
 const API_KEY = process.env.API_KEY;
 
@@ -32,11 +33,11 @@ const routeSchema = {
       },
       similarityScore: {
         type: Type.NUMBER,
-        description: 'A score from 0.0 to 1.0 indicating how well the route artistically and structurally evokes the drawn shape. 1.0 is a perfect representation.',
+        description: 'A score from 0.0 to 1.0 indicating how well the route thematically and geometrically matches the drawn shape. 1.0 is a perfect match.',
       },
       path: {
         type: Type.ARRAY,
-        description: "An array of geographic coordinates representing the route path. When plotted, this path should artistically resemble the user's drawing.",
+        description: "An array of geographic coordinates representing the route path. When plotted, this path should geometrically match the user's drawing.",
         items: {
           type: Type.ARRAY,
           description: "A coordinate pair: [latitude, longitude].",
@@ -50,45 +51,98 @@ const routeSchema = {
   },
 };
 
-function serializeDrawing(drawing: Point[][]): string {
-  return drawing.map(stroke => 
-    stroke.map(p => `${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ')
-  ).join(' M '); // Using ' M ' as a separator for multi-stroke paths
+function generatePrompt(features: ShapeFeatures, location: string, mode: TransportationMode, creativity: CreativityLevel): string {
+    const straightnessDesc = features.straightness > 0.7 ? 'very straight' : features.straightness > 0.4 ? 'moderately straight' : 'winding and indirect';
+    
+    const analysisBlock = `
+**USER DRAWING ANALYSIS (NORMALIZED):**
+- **Shape Type:** ${features.isClosed ? 'Closed Loop' : 'Open Path'}
+- **Aspect Ratio:** ${features.aspectRatio.toFixed(2)}
+- **Complexity:** ${features.complexity.toFixed(2)} (0=simple, 1=complex)
+- **Straightness:** ${straightnessDesc} (${(features.straightness * 100).toFixed(0)}%)
+- **Key Features:** ${features.sharpTurns} sharp turns (<90°), ${features.corners.length} total corners (<135°)
+- **Curvature:** ${features.averageRadius === Infinity ? 'Composed of straight lines' : `Average curve radius of ${features.averageRadius.toFixed(2)} units`}
+- **SVG-like Path Data:** "${features.normalizedPath}"
+`;
+
+    let instructions = '';
+    switch (creativity) {
+        case 'creative':
+            const creativeSummary = `
+**USER DRAWING ANALYSIS (ARTIST'S INTERPRETATION):**
+- **Overall Form:** The user drew a shape that is ${features.isClosed ? 'a closed loop.' : 'an open path.'}
+- **Dominant Feel:** It feels ${features.sharpTurns > 3 ? 'very angular and sharp' : features.corners.length > features.totalLength * 0.5 ? 'angular' : 'smooth and curvy'}.
+- **Path Character:** The path is generally ${straightnessDesc}.
+- **Impression:** It has ${features.complexity > 0.6 ? 'high complexity with many details.' : 'a simple, clean form.'}`;
+
+            instructions = `
+You are an expert and artistic "Geospatial Shape Interpreter". Your task is to find real-world routes in "${location}" for "${mode}" that capture the *artistic spirit and overall form* of a user's drawing.
+
+${creativeSummary}
+
+**CREATIVE INSTRUCTIONS:**
+1.  **Primary Goal:** Find a real-world route that *feels* like the drawing. This is an artistic and interpretive task. For example, if the user draws a heart, find a plausible heart-shaped route, even if it's not a perfect geometric match.
+2.  **Thematic Matching:** Prioritize the overall shape and concept over a literal, point-for-point match. The sequence of turns and general proportions are more important than exact segment lengths or angles.
+3.  **Plausibility:** The route must exist within "${location}", be plausible for ${mode}, and use actual streets, paths, or trails.
+4.  **Similarity Score:** Your generated \`similarityScore\` must reflect how well the route captures the *essence* of the shape. A score of 0.75 or higher is desirable. If you cannot find a good thematic match, return an empty array.
+5.  **Output Format:** Respond with ONLY a valid JSON array of route objects.
+`;
+            break;
+        case 'balanced':
+            instructions = `
+You are an expert "Geospatial Shape Matching AI". Your task is to find real-world routes in "${location}" for "${mode}" that have a strong geometric similarity to a user's drawing.
+
+${analysisBlock}
+
+**BALANCED INSTRUCTIONS:**
+1.  **Primary Goal:** Find a real-world route whose path has a strong geometric resemblance to the user's drawing.
+2.  **Geometric Fidelity:** The route should closely follow the general shape, aspect ratio, and sequence of turns from the drawing and SVG path data. Some minor deviations are acceptable.
+3.  **Location Context:** The route must exist within "${location}" and be plausible for ${mode}.
+4.  **Similarity Score:** Your generated \`similarityScore\` must be an honest assessment of the geometric match. A score of 0.85 or higher is desirable. If you cannot find a route with a score of at least 0.7, return an empty array.
+5.  **Output Format:** Respond with ONLY a valid JSON array of route objects.
+`;
+            break;
+        case 'strict':
+        default:
+            instructions = `
+You are a precision "Geospatial Shape Matching AI". Your task is to find real-world routes in "${location}" for "${mode}" that are a near-perfect geometric match to a user's drawing. Precision is paramount.
+
+${analysisBlock}
+
+**STRICT INSTRUCTIONS:**
+1.  **Primary Goal:** Find a real-world route whose path, when plotted on a map, is geometrically identical to the user's drawing.
+2.  **Geometric Fidelity:** The sequence of turns, the length of straight segments, and the curvature of bends in the route must precisely mirror the provided SVG-like path data. The aspect ratio must be preserved.
+3.  **Location Context:** The route must exist within "${location}" and be plausible for ${mode}.
+4.  **Similarity Score:** Your generated \`similarityScore\` must be an honest, critical assessment of the geometric match. A score of 0.95 or higher is required for an acceptable match. If you cannot find a route with a score of at least 0.8, return an empty array.
+5.  **Output Format:** Respond with ONLY a valid JSON array of route objects.
+`;
+            break;
+    }
+    return instructions + "\nFind up to 3 routes that meet these criteria.";
 }
+
 
 export const findMatchingRoutes = async (
   drawing: Point[][],
   location: string,
-  mode: TransportationMode
+  mode: TransportationMode,
+  creativity: CreativityLevel
 ): Promise<Route[]> => {
-  const serializedShape = serializeDrawing(drawing);
+  const features = analyzeShape(drawing);
 
-  const prompt = `
-You are a "Geospatial Artistry AI". Your mission is to discover real-world routes that artistically and structurally evoke the essence of a user's drawing. Forget pixel-perfect geometric matches; instead, find a route that a human would recognize as a creative, recognizable representation of the drawn shape.
+  if (!features) {
+    console.warn("Shape analysis returned null. The drawing may be too simple.");
+    return [];
+  }
 
-**Your Goal:**
-Find a navigable route in "${location}" for the "${mode}" transportation mode that artistically resembles the following shape.
+  const prompt = generatePrompt(features, location, mode, creativity);
+  
+  const modelConfig = {
+      'strict':   { temperature: 0.1, topP: 0.95, topK: 40 },
+      'balanced': { temperature: 0.4, topP: 0.95, topK: 64 },
+      'creative': { temperature: 0.8, topP: 1.0,  topK: 64 },
+  }[creativity];
 
-**Shape Data (Normalized SVG-like coordinates):**
-"${serializedShape}"
-
-**Artistic Analysis Protocol:**
-1.  **Deconstruct the Shape's Essence:** Analyze the drawing not just as lines, but as a concept. What does it represent?
-    *   **Structure:** Identify the core structural elements. For a letter 'A', this is two angled lines meeting at a peak with a horizontal crossbar. For a spiral, it's a continuously tightening curve.
-    *   **Character:** Is it sharp and angular? Soft and looping? Simple? Complex?
-2.  **Find a Structural Analogy:** Search the road network of "${location}" for a route whose structure mirrors the shape's essence. The match can be scaled, rotated, or slightly distorted. The key is preserving the fundamental character.
-3.  **Creative Similarity Scoring:** The \`similarityScore\` must reflect how well the route captures the artistic spirit and structural foundation of the drawing.
-    *   **0.9+:** An incredibly clever and clear match that is instantly recognizable as the shape.
-    *   **0.7-0.89:** A good, creative representation that clearly captures the main elements.
-    *   **< 0.7:** A more abstract interpretation that shares some key characteristics. Do not return routes with scores below 0.6.
-4.  **Example Task:**
-    *   **Input Shape:** A drawing of the letter 'S'.
-    *   **Analysis:** Two opposing curves connected smoothly.
-    *   **Your Ideal Output:** Find a winding road or a set of connected streets that form a clear 'S' curve.
-5.  **Output:** Return ONLY a valid JSON array of route objects. Do not include any explanatory text or markdown.
-
-Now, apply this artistic approach to find the most evocative route for the user's shape.
-`;
 
   try {
     const response = await ai.models.generateContent({
@@ -97,11 +151,24 @@ Now, apply this artistic approach to find the most evocative route for the user'
         config: {
             responseMimeType: "application/json",
             responseSchema: routeSchema,
-            temperature: 0.6, // Higher temperature for more "creative" but still relevant results.
+            ...modelConfig,
         },
     });
 
-    const jsonString = response.text.trim();
+    const text = response.text;
+
+    if (!text) {
+        console.error("Gemini API response did not contain text.", JSON.stringify(response, null, 2));
+        
+        const finishReason = response?.candidates?.[0]?.finishReason;
+        if (finishReason && finishReason !== 'STOP') {
+            throw new Error(`Route generation failed. Reason: ${finishReason}. Please try a different shape or location.`);
+        }
+        
+        throw new Error("The AI returned an empty response. Please try drawing a different shape.");
+    }
+
+    const jsonString = text.trim();
     const routes = JSON.parse(jsonString) as Route[];
     
     // Basic validation
@@ -114,6 +181,12 @@ Now, apply this artistic approach to find the most evocative route for the user'
 
   } catch (error) {
     console.error("Error calling Gemini API:", error);
-    throw new Error("Failed to generate routes from AI. Please check the console for details.");
+    if (error instanceof SyntaxError) {
+        throw new Error("The AI returned a response in an invalid format. Please try again.");
+    }
+    if (error instanceof Error) {
+        throw new Error(error.message); // Pass the specific error message to the UI
+    }
+    throw new Error("An unknown error occurred while generating routes from the AI.");
   }
 };

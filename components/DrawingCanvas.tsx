@@ -1,6 +1,6 @@
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { Point } from '../types';
+import { ClearIcon } from './icons/ClearIcon';
 
 interface DrawingCanvasProps {
   onDrawingChange: (drawing: Point[][]) => void;
@@ -31,7 +31,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     ctx.clearRect(0, 0, width, height);
 
     // Draw grid
-    ctx.strokeStyle = '#4A5568'; // gray-700
+    ctx.strokeStyle = 'rgba(75, 85, 99, 0.5)'; // gray-600/50
     ctx.lineWidth = 0.5;
     const gridSize = 20;
     for (let x = 0; x < width; x += gridSize) {
@@ -48,8 +48,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
     
     // Draw existing strokes
-    ctx.strokeStyle = '#63B3ED'; // blue-400
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#67E8F9'; // cyan-300
+    ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -94,8 +94,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     const ctx = getCanvasContext();
     if (!ctx || newStroke.length < 2) return;
 
-    ctx.strokeStyle = '#90CDF4'; // blue-300
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#A5F3FC'; // cyan-200
+    ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
@@ -115,17 +115,32 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     setCurrentStroke([]);
   };
 
+  const handleClearDrawing = () => {
+      onDrawingChange([]);
+  };
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      onMouseDown={startDrawing}
-      onMouseMove={draw}
-      onMouseUp={stopDrawing}
-      onMouseLeave={stopDrawing}
-      className="bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair"
-    />
+    <div className="relative">
+        <canvas
+            ref={canvasRef}
+            width={width}
+            height={height}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            className="bg-gray-800 border-2 border-gray-700 rounded-lg cursor-crosshair shadow-inner"
+        />
+        {drawing.length > 0 && (
+            <button
+                onClick={handleClearDrawing}
+                className="absolute top-2 right-2 bg-gray-800/50 hover:bg-red-600/80 text-white p-2 rounded-full transition-colors backdrop-blur-sm"
+                aria-label="Clear drawing"
+            >
+                <ClearIcon />
+            </button>
+        )}
+    </div>
   );
 };
 

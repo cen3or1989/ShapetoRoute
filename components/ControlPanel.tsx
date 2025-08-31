@@ -1,9 +1,12 @@
-
 import React from 'react';
-import type { Point, Route, TransportationMode } from '../types';
+import type { Point, Route, TransportationMode, CreativityLevel } from '../types';
 import DrawingCanvas from './DrawingCanvas';
 import { WalkIcon, BikeIcon, CarIcon } from './icons/TransportationIcons';
+import { StrictIcon, BalancedIcon, CreativeIcon } from './icons/CreativityIcons';
 import RouteResultItem from './RouteResultItem';
+import Header from './Header';
+import EmptyState from './EmptyState';
+import LoadingIndicator from './LoadingIndicator';
 
 interface ControlPanelProps {
   drawing: Point[][];
@@ -12,13 +15,24 @@ interface ControlPanelProps {
   setLocation: (location: string) => void;
   mode: TransportationMode;
   setMode: (mode: TransportationMode) => void;
+  creativity: CreativityLevel;
+  setCreativity: (creativity: CreativityLevel) => void;
   onFindRoutes: () => void;
-  isLoading: boolean;
+  loadingMessage: string | null;
   error: string | null;
   routes: Route[];
   activeRouteIndex: number | null;
   setActiveRouteIndex: (index: number | null) => void;
 }
+
+const Section: React.FC<{ number: number; title: string; children: React.ReactNode }> = ({ number, title, children }) => (
+    <div className="space-y-3">
+      <h2 className="text-sm font-bold uppercase tracking-wider text-cyan-400">
+        Step {number}: <span className="text-gray-300">{title}</span>
+      </h2>
+      {children}
+    </div>
+);
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   drawing,
@@ -27,84 +41,79 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   setLocation,
   mode,
   setMode,
+  creativity,
+  setCreativity,
   onFindRoutes,
-  isLoading,
+  loadingMessage,
   error,
   routes,
   activeRouteIndex,
   setActiveRouteIndex
 }) => {
 
-  const handleClearDrawing = () => {
-    setDrawing([]);
-  };
-
   return (
-    <aside className="w-[450px] h-full bg-gray-800 p-6 flex flex-col shadow-2xl z-10 overflow-y-auto">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold text-white">Shape → Route</h1>
-        <p className="text-gray-400 mt-1">Draw a shape, find a real-world route.</p>
-      </header>
+    <aside className="w-[450px] h-full bg-gray-900 p-6 flex flex-col shadow-2xl z-10 overflow-y-auto">
+      <Header />
       
       <div className="flex flex-col space-y-6 flex-grow">
-        <div>
-          <label className="text-sm font-semibold text-gray-400 block mb-2">1. Draw your desired route shape</label>
-          <div className="relative">
-            <DrawingCanvas onDrawingChange={setDrawing} drawing={drawing} />
-            <button
-              onClick={handleClearDrawing}
-              className="absolute top-2 right-2 bg-gray-700 hover:bg-red-600 text-white px-3 py-1 text-xs rounded-md transition-colors"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+        
+        <Section number={1} title="Draw Your Route Shape">
+          <DrawingCanvas onDrawingChange={setDrawing} drawing={drawing} />
+        </Section>
 
-        <div>
-          <label htmlFor="location" className="text-sm font-semibold text-gray-400 block mb-2">2. Enter a location</label>
+        <Section number={2} title="Set Location">
           <input
             id="location"
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g., Paris, France"
-            className="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+            className="w-full bg-gray-800 border-2 border-gray-700 rounded-md px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors"
           />
-        </div>
+        </Section>
         
-        <div>
-            <label className="text-sm font-semibold text-gray-400 block mb-2">3. Choose transportation mode</label>
+        <Section number={3} title="Choose Transport">
             <div className="grid grid-cols-3 gap-3">
                 <ModeButton selected={mode === 'walking'} onClick={() => setMode('walking')} label="Walking"><WalkIcon /></ModeButton>
                 <ModeButton selected={mode === 'cycling'} onClick={() => setMode('cycling')} label="Cycling"><BikeIcon /></ModeButton>
                 <ModeButton selected={mode === 'driving'} onClick={() => setMode('driving')} label="Driving"><CarIcon /></ModeButton>
             </div>
-        </div>
+        </Section>
 
+        <Section number={4} title="Set Creativity">
+            <div className="grid grid-cols-3 gap-3">
+                <ModeButton selected={creativity === 'strict'} onClick={() => setCreativity('strict')} label="Strict"><StrictIcon /></ModeButton>
+                <ModeButton selected={creativity === 'balanced'} onClick={() => setCreativity('balanced')} label="Balanced"><BalancedIcon /></ModeButton>
+                <ModeButton selected={creativity === 'creative'} onClick={() => setCreativity('creative')} label="Creative"><CreativeIcon /></ModeButton>
+            </div>
+        </Section>
+        
         <div>
           <button
             onClick={onFindRoutes}
-            disabled={isLoading || drawing.length === 0}
-            className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md flex items-center justify-center transition-all duration-200"
+            disabled={loadingMessage !== null || drawing.length === 0}
+            className="w-full bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all duration-200 text-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-400/30"
           >
-            {isLoading ? (
+            {loadingMessage ? (
               <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Finding Routes...
+                {loadingMessage}
               </>
-            ) : 'Find Matching Route'}
+            ) : '✨ Find My Route'}
           </button>
         </div>
         
-        {error && <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-md text-sm">{error}</div>}
+        {error && <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-md text-sm">{error}</div>}
 
-        <div className="flex-grow overflow-y-auto pr-2 -mr-2">
-            <h2 className="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-2 mb-4">Results</h2>
-            {routes.length > 0 ? (
-                <div className="space-y-3">
+        <div className="flex-grow flex flex-col min-h-0">
+            <h2 className="text-lg font-bold text-gray-200 border-b border-gray-700 pb-2 mb-4">Results</h2>
+            {loadingMessage && routes.length === 0 ? (
+              <LoadingIndicator message={loadingMessage} />
+            ) : routes.length > 0 ? (
+                <div className="space-y-3 overflow-y-auto pr-2 -mr-4">
                     {routes.map((route, index) => (
                         <RouteResultItem 
                           key={index} 
@@ -116,12 +125,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     ))}
                 </div>
             ) : (
-                <div className="text-center text-gray-500 py-8">
-                    { !isLoading && <p>Matching routes will appear here.</p> }
-                </div>
+                <EmptyState />
             )}
         </div>
-
       </div>
     </aside>
   );
@@ -138,10 +144,10 @@ interface ModeButtonProps {
 const ModeButton: React.FC<ModeButtonProps> = ({ selected, onClick, children, label }) => (
     <button
         onClick={onClick}
-        className={`flex flex-col items-center justify-center p-3 rounded-md border-2 transition-colors ${
+        className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200 group ${
             selected 
-            ? 'bg-cyan-800 border-cyan-500 text-white' 
-            : 'bg-gray-700 border-gray-600 hover:border-gray-500 text-gray-400'
+            ? 'bg-cyan-500/10 border-cyan-500 text-white shadow-md shadow-cyan-500/10' 
+            : 'bg-gray-800 border-gray-700 hover:border-gray-600 hover:bg-gray-700/50 text-gray-400'
         }`}
     >
         {children}

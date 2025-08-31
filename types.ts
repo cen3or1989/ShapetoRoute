@@ -5,6 +5,7 @@ export interface Point {
 }
 
 export type TransportationMode = 'walking' | 'cycling' | 'driving';
+export type CreativityLevel = 'strict' | 'balanced' | 'creative';
 
 export interface Route {
   routeName: string;
