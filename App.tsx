@@ -2,62 +2,34 @@
 import React, { useState, useCallback } from 'react';
 import ControlPanel from './components/ControlPanel';
 import MapDisplay from './components/MapDisplay';
-import { Point, Route, TransportationMode } from './types';
-import { findMatchingRoutes } from './services/geminiService';
+import { Point, TransportationMode } from './types';
+import { useRouteSearch } from './hooks/useRouteSearch';
 
 const App: React.FC = () => {
   const [drawing, setDrawing] = useState<Point[][]>([]);
   const [location, setLocation] = useState<string>('San Francisco, CA');
   const [mode, setMode] = useState<TransportationMode>('walking');
-  const [routes, setRoutes] = useState<Route[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]);
-  const [mapZoom, setMapZoom] = useState<number>(13);
-  const [activeRouteIndex, setActiveRouteIndex] = useState<number | null>(null);
+  
+  const {
+    routes,
+    isLoading,
+    error,
+    mapCenter,
+    mapZoom,
+    activeRouteIndex,
+    setActiveRouteIndex,
+    searchRoutes,
+    clearResults
+  } = useRouteSearch();
 
   const handleFindRoutes = useCallback(async () => {
-    if (drawing.length === 0) {
-      setError('Please draw a shape first.');
-      return;
-    }
-    if (!location) {
-      setError('Please enter a location.');
-      return;
-    }
+    await searchRoutes(drawing, location, mode);
+  }, [drawing, location, mode, searchRoutes]);
 
-    setIsLoading(true);
-    setError(null);
-    setRoutes([]);
-    setActiveRouteIndex(null);
-
-    try {
-      // Geocode location to get coordinates for map view
-      const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1`);
-      const geoData = await geoResponse.json();
-      
-      if (geoData.length > 0) {
-        const { lat, lon } = geoData[0];
-        setMapCenter([parseFloat(lat), parseFloat(lon)]);
-        setMapZoom(14);
-      } else {
-         setError(`Could not find location: ${location}`);
-         setIsLoading(false);
-         return;
-      }
-
-      const foundRoutes = await findMatchingRoutes(drawing, location, mode);
-      if (foundRoutes.length > 0) {
-        setRoutes(foundRoutes);
-      } else {
-        setError('No matching routes found. Try a different shape or location.');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? `An error occurred: ${err.message}`: 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [drawing, location, mode]);
+  const handleClearDrawing = useCallback(() => {
+    setDrawing([]);
+    clearResults();
+  }, [clearResults]);
 
   return (
     <div className="flex h-screen font-sans bg-gray-900 text-gray-200">

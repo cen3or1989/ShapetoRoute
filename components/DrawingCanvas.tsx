@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, memo } from 'react';
 import type { Point } from '../types';
 
 interface DrawingCanvasProps {
@@ -9,7 +9,7 @@ interface DrawingCanvasProps {
   height?: number;
 }
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
+const DrawingCanvas: React.FC<DrawingCanvasProps> = memo(({
   onDrawingChange,
   drawing,
   width = 400,
@@ -127,6 +127,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       className="bg-gray-900 border-2 border-dashed border-gray-600 rounded-lg cursor-crosshair"
     />
   );
-};
+});
+
+DrawingCanvas.displayName = 'DrawingCanvas';
 
 export default DrawingCanvas;

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import type { Route } from '../types';
 
 interface RouteResultItemProps {
@@ -9,7 +9,7 @@ interface RouteResultItemProps {
     onClick: () => void;
 }
 
-const RouteResultItem: React.FC<RouteResultItemProps> = ({ route, isActive, onClick }) => {
+const RouteResultItem: React.FC<RouteResultItemProps> = memo(({ route, isActive, onClick }) => {
     return (
         <div
             onClick={onClick}
@@ -36,6 +36,8 @@ const RouteResultItem: React.FC<RouteResultItemProps> = ({ route, isActive, onCl
             </div>
         </div>
     );
-};
+});
+
+RouteResultItem.displayName = 'RouteResultItem';
 
 export default RouteResultItem;

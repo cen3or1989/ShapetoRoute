@@ -1,13 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Point, Route, TransportationMode } from '../types';
+import { validateApiKey, sanitizeLocation, sanitizeRouteData } from '../utils/security';
+import { APIError } from '../types/errors';
 
 const API_KEY = process.env.API_KEY;
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
+validateApiKey(API_KEY);
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
 const routeSchema = {
   type: Type.ARRAY,
@@ -61,13 +61,14 @@ export const findMatchingRoutes = async (
   location: string,
   mode: TransportationMode
 ): Promise<Route[]> => {
+  const sanitizedLocation = sanitizeLocation(location);
   const serializedShape = serializeDrawing(drawing);
 
   const prompt = `
 You are a "Geospatial Artistry AI". Your mission is to discover real-world routes that artistically and structurally evoke the essence of a user's drawing. Forget pixel-perfect geometric matches; instead, find a route that a human would recognize as a creative, recognizable representation of the drawn shape.
 
 **Your Goal:**
-Find a navigable route in "${location}" for the "${mode}" transportation mode that artistically resembles the following shape.
+Find a navigable route in "${sanitizedLocation}" for the "${mode}" transportation mode that artistically resembles the following shape.
 
 **Shape Data (Normalized SVG-like coordinates):**
 "${serializedShape}"
@@ -102,15 +103,17 @@ Now, apply this artistic approach to find the most evocative route for the user'
     });
 
     const jsonString = response.text.trim();
-    const routes = JSON.parse(jsonString) as Route[];
+    const rawRoutes = JSON.parse(jsonString);
     
     // Basic validation
-    if (!Array.isArray(routes)) {
-        console.error("Gemini response is not an array:", routes);
-        return [];
+    if (!Array.isArray(rawRoutes)) {
+        console.error("Gemini response is not an array:", rawRoutes);
+        throw new APIError("Invalid response format from AI service");
     }
     
-    return routes.filter(route => route.path && route.path.length > 1);
+    // Sanitize and validate routes
+    const sanitizedRoutes = sanitizeRouteData(rawRoutes);
+    return sanitizedRoutes.filter(route => route.path && route.path.length > 1) as Route[];
 
   } catch (error) {
     console.error("Error calling Gemini API:", error);
