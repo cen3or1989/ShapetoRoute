@@ -11,6 +11,8 @@ export interface Route {
   description: string;
   distance: number; // in kilometers
   duration: number; // in minutes
-  similarityScore: number; // 0 to 1
+  similarityScore: number; // 0 to 1 (AI-generated)
+  geometricSimilarity?: number; // 0 to 1 (calculated)
   path: [number, number][]; // Array of [lat, lng]
+  matchingIssues?: string[]; // Geometric validation issues
 }

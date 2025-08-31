@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Point, Route, TransportationMode } from '../types';
 import DrawingCanvas from './DrawingCanvas';
 import { WalkIcon, BikeIcon, CarIcon } from './icons/TransportationIcons';
 import RouteResultItem from './RouteResultItem';
+import { analyzeShape, validateShape, createGeometricDescription } from '../services/shapeAnalysis';
 
 interface ControlPanelProps {
   drawing: Point[][];
@@ -39,6 +40,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     setDrawing([]);
   };
 
+  // Analyze shape in real-time for user feedback
+  const shapeAnalysis = useMemo(() => {
+    const validation = validateShape(drawing);
+    if (!validation.isValid) {
+      return { validation, features: null };
+    }
+    
+    try {
+      const features = analyzeShape(drawing);
+      return { validation, features };
+    } catch (error) {
+      return { 
+        validation: { 
+          isValid: false, 
+          issues: ['Shape analysis failed'], 
+          recommendations: ['Try drawing a clearer shape'] 
+        }, 
+        features: null 
+      };
+    }
+  }, [drawing]);
+
   return (
     <aside className="w-[450px] h-full bg-gray-800 p-6 flex flex-col shadow-2xl z-10 overflow-y-auto">
       <header className="mb-6">
@@ -58,6 +81,40 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               Clear
             </button>
           </div>
+          
+          {/* Shape Analysis Feedback */}
+          {drawing.length > 0 && (
+            <div className="mt-3 p-3 bg-gray-900 rounded-md border border-gray-600">
+              <div className="text-xs font-semibold text-gray-400 mb-2">Shape Analysis</div>
+              {shapeAnalysis.validation.isValid && shapeAnalysis.features ? (
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>Type: <span className="text-cyan-400 font-semibold">{shapeAnalysis.features.detectedType}</span> ({(shapeAnalysis.features.confidence * 100).toFixed(0)}% confidence)</div>
+                  <div>Structure: <span className="text-cyan-400">{shapeAnalysis.features.isClosed ? 'Closed loop' : 'Open path'}</span></div>
+                  <div>Complexity: <span className="text-cyan-400">{(shapeAnalysis.features.complexity * 100).toFixed(0)}%</span></div>
+                  <div>Corners: <span className="text-cyan-400">{shapeAnalysis.features.corners.length}</span></div>
+                </div>
+              ) : (
+                <div className="text-xs text-yellow-400">
+                  <div className="font-semibold mb-1">Issues:</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {shapeAnalysis.validation.issues.map((issue, idx) => (
+                      <li key={idx}>{issue}</li>
+                    ))}
+                  </ul>
+                  {shapeAnalysis.validation.recommendations.length > 0 && (
+                    <div className="mt-2">
+                      <div className="font-semibold">Suggestions:</div>
+                      <ul className="list-disc list-inside space-y-1">
+                        {shapeAnalysis.validation.recommendations.map((rec, idx) => (
+                          <li key={idx} className="text-yellow-300">{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
@@ -84,7 +141,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div>
           <button
             onClick={onFindRoutes}
-            disabled={isLoading || drawing.length === 0}
+            disabled={isLoading || !shapeAnalysis.validation.isValid}
             className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md flex items-center justify-center transition-all duration-200"
           >
             {isLoading ? (
